@@ -2,7 +2,7 @@ import os
 import sqlite3
 from datetime import datetime
 import smtplib
-from email.mime_text import MIMEText  # 如果錯誤就改回 from email.mime.text import MIMEText
+from email.mime.text import MIMEText  # 如果錯誤就改回 from email.mime.text import MIMEText
 
 from flask import (
     Flask, render_template, request,
