@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}中華民國排球協會教練時數登記{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <!-- LOGO 圖示（如果 static/logo.png 存在就會顯示） -->
+      <img src="{{ url_for('static', filename='logo.png') }}" alt="協會 LOGO" class="header-logo">
+      <h1>中華民國排球協會教練時數登記</h1>
+      <div class="header-subtitle">
+        線上教練基本資料與教練證時數登記系統
+      </div>
+    </header>
+
+    <main>
+      <div class="card">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+</body>
+</html>

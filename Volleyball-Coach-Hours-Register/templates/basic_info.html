@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}基本資料 - 排球教練證登記{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+  <div class="step-pill active">步驟一：基本資料</div>
+  <div class="step-pill">步驟二：教練證資料</div>
+</div>
+
+<h2>基本資料</h2>
+
+<p class="info">請先填寫填報人資訊，之後再輸入各位教練的證號。</p>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<form method="post" class="form">
+  <label>
+    姓名：
+    <input type="text" name="name" value="{{ form.get('name','') }}" required>
+  </label>
+
+  <label>
+    校名：
+    <input type="text" name="school" value="{{ form.get('school','') }}" required>
+  </label>
+
+  <label>
+    連絡電話：
+    <input type="tel" name="phone" value="{{ form.get('phone','') }}" required>
+    <span class="hint">建議填寫可於比賽當日聯絡之手機號碼。</span>
+  </label>
+
+  <button type="submit" class="btn">下一步 ▶</button>
+</form>
+{% endblock %}

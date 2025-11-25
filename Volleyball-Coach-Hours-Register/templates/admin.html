@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}後台 - 排球教練證登記{% endblock %}
+
+{% block head_extra %}
+<meta http-equiv="refresh" content="10">  <!-- 每 10 秒自動重整 -->
+{% endblock %}
+
+{% block content %}
+<h2>後台統計（自動每 10 秒更新一次）</h2>
+
+<div class="admin-stats">
+  <span>總筆數：{{ total_submissions }}</span>
+  <span>／</span>
+  <span>總教練證數量：{{ total_certificates }}</span>
+</div>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>填寫人</th>
+      <th>學校</th>
+      <th>電話</th>
+      <th>教練數量</th>
+      <th>填寫時間</th>
+      <th>教練明細</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in submissions %}
+    <tr>
+      <td>{{ s.id }}</td>
+      <td>{{ s.name }}</td>
+      <td>{{ s.school }}</td>
+      <td>{{ s.phone }}</td>
+      <td>{{ s.coach_count }}</td>
+      <td>{{ s.created_at }}</td>
+      <td>
+        {% set detail = details.get(s.id, []) %}
+        {% if detail %}
+          <ul>
+          {% for d in detail %}
+            <li>{{ d.coach_name }}：{{ d.coach_license }}</li>
+          {% endfor %}
+          </ul>
+        {% else %}
+          無資料
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}教練證資料 - 排球教練證登記{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+  <div class="step-pill">步驟一：基本資料</div>
+  <div class="step-pill active">步驟二：教練證資料</div>
+</div>
+
+<h2>教練證資料</h2>
+
+<p class="info">
+  填寫人：{{ basic.name }}（{{ basic.school }} / {{ basic.phone }}）
+</p>
+<p class="info">
+  請依序輸入本隊隨隊教練姓名與教練證號，可視需要新增多筆。
+</p>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<form method="post" id="cert-form" class="form">
+  <div id="rows">
+    <div class="row">
+      <label>
+        教練姓名：
+        <input type="text" name="coach_name" required>
+      </label>
+      <label>
+        教練證號：
+        <input type="text" name="coach_license" required>
+      </label>
+      <button type="button" class="btn btn-secondary remove-row" onclick="removeRow(this)" style="display:none;">刪除</button>
+    </div>
+  </div>
+
+  <button type="button" class="btn btn-secondary" onclick="addRow()">＋ 新增一筆教練</button>
+  <button type="submit" class="btn">送出所有資料 ✅</button>
+</form>
+
+<script>
+function addRow() {
+  const rowsDiv = document.getElementById('rows');
+  const row = document.createElement('div');
+  row.className = 'row';
+
+  row.innerHTML = `
+    <label>
+      教練姓名：
+      <input type="text" name="coach_name" required>
+    </label>
+    <label>
+      教練證號：
+      <input type="text" name="coach_license" required>
+    </label>
+    <button type="button" class="btn btn-secondary remove-row" onclick="removeRow(this)">刪除</button>
+  `;
+  rowsDiv.appendChild(row);
+}
+
+function removeRow(btn) {
+  const row = btn.closest('.row');
+  const rowsDiv = document.getElementById('rows');
+  if (rowsDiv.children.length > 1) {
+    rowsDiv.removeChild(row);
+  }
+}
+</script>
+{% endblock %}
