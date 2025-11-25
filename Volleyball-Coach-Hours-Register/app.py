@@ -282,6 +282,7 @@ def init_db_command():
 
 
 if __name__ == "__main__":
+    123
     # 本機直接跑 app.py 時也會確保資料表存在
     with app.app_context():
         init_db()
