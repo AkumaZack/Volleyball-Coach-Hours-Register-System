@@ -184,7 +184,7 @@ def certificates():
         lines = [
             "🏐 教練證資料已送出",
             f"填寫人：{basic_info['name']}",
-            f"學校：{basic_info['school']}",
+            f"隊名：{basic_info['school']}",
             f"電話：{basic_info['phone']}",
             "",
             "教練與證號：",
