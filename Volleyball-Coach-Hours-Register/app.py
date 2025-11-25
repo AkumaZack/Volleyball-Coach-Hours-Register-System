@@ -2,18 +2,18 @@ import os
 import sqlite3
 from datetime import datetime
 import smtplib
-from email.mime.text import MIMEText
+from email.mime_text import MIMEText  # 如果錯誤就改回 from email.mime.text import MIMEText
 
 from flask import (
     Flask, render_template, request,
     redirect, url_for, session, g, abort
 )
 
-# 嘗試載入本機 config（在雲端可省略，改用環境變數）
+# 嘗試載入本機 config（給你在自己電腦使用）
 try:
-    import config  # type: ignore
+    import config
 except ImportError:
-    class config:  # type: ignore
+    class config:
         ADMIN_KEY = "changeme"
         EMAIL_SMTP_SERVER = "smtp.gmail.com"
         EMAIL_SMTP_PORT = 587
@@ -22,24 +22,13 @@ except ImportError:
         EMAIL_TO = ""
 
 
-class Settings:
-    """設定來源：
-    1. 先讀環境變數（雲端部署用）
-    2. 若沒有，退回本機 config.py (開發用)
-    """
-    ADMIN_KEY = os.getenv("ADMIN_KEY", getattr(config, "ADMIN_KEY", "changeme"))
-
-    EMAIL_SMTP_SERVER = os.getenv("EMAIL_SMTP_SERVER", getattr(config, "EMAIL_SMTP_SERVER", "smtp.gmail.com"))
-    EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", str(getattr(config, "EMAIL_SMTP_PORT", 587))))
-    EMAIL_USERNAME = os.getenv("EMAIL_USERNAME", getattr(config, "EMAIL_USERNAME", ""))
-    EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", getattr(config, "EMAIL_PASSWORD", ""))
-    EMAIL_TO = os.getenv("EMAIL_TO", getattr(config, "EMAIL_TO", ""))
-
-
-settings = Settings()
-
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "a-very-secret-key-change-this")
+
+# secret key：優先讀環境變數，其次 config，最後給預設值
+app.secret_key = os.getenv(
+    "FLASK_SECRET_KEY",
+    getattr(config, "FLASK_SECRET_KEY", "a-very-secret-key-change-this")
+)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
 
@@ -92,12 +81,12 @@ def init_db():
 # ------------------ Email 通知 ------------------ #
 
 def send_email_notify(subject: str, body: str):
-    """用 Gmail 寄通知給你自己"""
-    username = settings.EMAIL_USERNAME
-    password = settings.EMAIL_PASSWORD
-    to_addr = settings.EMAIL_TO
-    smtp_server = settings.EMAIL_SMTP_SERVER
-    smtp_port = settings.EMAIL_SMTP_PORT
+    """用 Gmail 寄通知（雲端：用環境變數；本機：用 config.py）"""
+    username = os.getenv("EMAIL_USERNAME", getattr(config, "EMAIL_USERNAME", ""))
+    password = os.getenv("EMAIL_PASSWORD", getattr(config, "EMAIL_PASSWORD", ""))
+    to_addr = os.getenv("EMAIL_TO", getattr(config, "EMAIL_TO", ""))
+    smtp_server = os.getenv("EMAIL_SMTP_SERVER", getattr(config, "EMAIL_SMTP_SERVER", "smtp.gmail.com"))
+    smtp_port = int(os.getenv("EMAIL_SMTP_PORT", getattr(config, "EMAIL_SMTP_PORT", 587)))
 
     if not username or not password or not to_addr:
         print("【提醒】Email 尚未完整設定，訊息內容如下：")
@@ -142,7 +131,6 @@ def basic_info():
             error = "請填寫完整基本資料。"
             return render_template("basic_info.html", error=error, form=request.form)
 
-        # 存進 session，待會第二頁用
         session["basic_info"] = {
             "name": name,
             "school": school,
@@ -150,7 +138,6 @@ def basic_info():
         }
         return redirect(url_for("certificates"))
 
-    # GET
     return render_template("basic_info.html", error=None, form={})
 
 
@@ -159,14 +146,12 @@ def basic_info():
 def certificates():
     basic_info = session.get("basic_info")
     if not basic_info:
-        # 沒有基本資料就導回第一頁
         return redirect(url_for("basic_info"))
 
     if request.method == "POST":
         coach_names = request.form.getlist("coach_name")
         coach_licenses = request.form.getlist("coach_license")
 
-        # 過濾掉空白的
         pairs = []
         for n, c in zip(coach_names, coach_licenses):
             n = n.strip()
@@ -178,7 +163,6 @@ def certificates():
             error = "請至少填寫一筆教練姓名與教練證號。"
             return render_template("certificates.html", error=error, basic=basic_info)
 
-        # 存進資料庫
         db = get_db()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cur = db.execute(
@@ -193,7 +177,6 @@ def certificates():
         )
         db.commit()
 
-        # 組 Email 內容
         lines = [
             "🏐 教練證資料已送出",
             f"填寫人：{basic_info['name']}",
@@ -208,27 +191,24 @@ def certificates():
         lines.append(f"送出時間：{now}")
         body = "\n".join(lines)
 
-        # 寄 Email 通知
         send_email_notify("教練證資料已送出", body)
 
-        # 清掉 session
         session.pop("basic_info", None)
 
         return render_template("complete.html")
 
-    # GET
     return render_template("certificates.html", error=None, basic=basic_info)
 
 
-# 後台頁面（簡單密碼驗證）
+# 後台頁面
 @app.route("/admin")
 def admin():
+    admin_key = os.getenv("ADMIN_KEY", getattr(config, "ADMIN_KEY", "changeme"))
     key = request.args.get("key", "")
-    if key != settings.ADMIN_KEY:
+    if key != admin_key:
         return abort(403)
 
     db = get_db()
-    # 整理出每筆 submission + 統計
     submissions = db.execute(
         """
         SELECT s.id,
@@ -249,7 +229,6 @@ def admin():
         "SELECT COUNT(*) FROM certificates"
     ).fetchone()[0]
 
-    # 明細：每筆 submission 底下的所有教練
     details = {}
     rows = db.execute(
         """
@@ -267,7 +246,6 @@ def admin():
 
     return render_template(
         "admin.html",
-        key=key,
         submissions=submissions,
         details=details,
         total_submissions=total_submissions,
@@ -275,10 +253,9 @@ def admin():
     )
 
 
-# 初始化 DB（第一次啟動用）
+# 初始化 DB
 @app.cli.command("init-db")
 def init_db_command():
-    """flask init-db 用"""
     init_db()
     print("Initialized the database.")
 
@@ -286,5 +263,4 @@ def init_db_command():
 if __name__ == "__main__":
     with app.app_context():
         init_db()
-    # 本機開發用
     app.run(debug=True, host="0.0.0.0", port=5000)
