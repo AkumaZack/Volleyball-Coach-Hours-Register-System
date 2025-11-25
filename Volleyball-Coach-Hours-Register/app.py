@@ -2,24 +2,25 @@ import os
 import sqlite3
 from datetime import datetime
 import smtplib
-from email.mime.text import MIMEText  # 如果錯誤就改回 from email.mime.text import MIMEText
+from email.mime.text import MIMEText  # 正確的匯入
 
 from flask import (
     Flask, render_template, request,
     redirect, url_for, session, g, abort
 )
 
-# 嘗試載入本機 config（給你在自己電腦使用）
+# 嘗試載入本機 config（在自己電腦上跑時用）
 try:
     import config
 except ImportError:
-    class config:
+    class config:  # 提供預設值，避免 ImportError
         ADMIN_KEY = "changeme"
         EMAIL_SMTP_SERVER = "smtp.gmail.com"
         EMAIL_SMTP_PORT = 587
         EMAIL_USERNAME = ""
         EMAIL_PASSWORD = ""
         EMAIL_TO = ""
+        FLASK_SECRET_KEY = "a-very-secret-key-change-this"
 
 
 app = Flask(__name__)
@@ -30,12 +31,14 @@ app.secret_key = os.getenv(
     getattr(config, "FLASK_SECRET_KEY", "a-very-secret-key-change-this")
 )
 
+# SQLite 資料庫位置
 DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
 
 
 # ------------------ 資料庫相關 ------------------ #
 
 def get_db():
+    """取得目前 request 使用的資料庫連線"""
     if "db" not in g:
         g.db = sqlite3.connect(DB_PATH)
         g.db.row_factory = sqlite3.Row
@@ -50,6 +53,7 @@ def close_db(exc):
 
 
 def init_db():
+    """建立所需的資料表（若不存在）"""
     db = get_db()
     # submissions: 基本資料
     db.execute(
@@ -78,16 +82,27 @@ def init_db():
     db.commit()
 
 
+# 🎯 關鍵：不管是在本機還是 Render（gunicorn 啟動），
+# 模組載入時就建立資料表，避免 "no such table" 的錯誤。
+with app.app_context():
+    init_db()
+
+
 # ------------------ Email 通知 ------------------ #
 
 def send_email_notify(subject: str, body: str):
-    """用 Gmail 寄通知（雲端：用環境變數；本機：用 config.py）"""
+    """
+    用 Gmail 寄出通知：
+    - 雲端：優先讀環境變數
+    - 本機：沒有環境變數就用 config.py
+    """
     username = os.getenv("EMAIL_USERNAME", getattr(config, "EMAIL_USERNAME", ""))
     password = os.getenv("EMAIL_PASSWORD", getattr(config, "EMAIL_PASSWORD", ""))
     to_addr = os.getenv("EMAIL_TO", getattr(config, "EMAIL_TO", ""))
     smtp_server = os.getenv("EMAIL_SMTP_SERVER", getattr(config, "EMAIL_SMTP_SERVER", "smtp.gmail.com"))
     smtp_port = int(os.getenv("EMAIL_SMTP_PORT", getattr(config, "EMAIL_SMTP_PORT", 587)))
 
+    # 如果 Email 沒設定好，就只在後台印出訊息，不要讓程式炸掉
     if not username or not password or not to_addr:
         print("【提醒】Email 尚未完整設定，訊息內容如下：")
         print("Subject:", subject)
@@ -131,6 +146,7 @@ def basic_info():
             error = "請填寫完整基本資料。"
             return render_template("basic_info.html", error=error, form=request.form)
 
+        # 暫存在 session，下一頁再寫入 DB
         session["basic_info"] = {
             "name": name,
             "school": school,
@@ -146,6 +162,7 @@ def basic_info():
 def certificates():
     basic_info = session.get("basic_info")
     if not basic_info:
+        # 沒有基本資料就導回第一頁
         return redirect(url_for("basic_info"))
 
     if request.method == "POST":
@@ -177,6 +194,7 @@ def certificates():
         )
         db.commit()
 
+        # 組 Email 內容
         lines = [
             "🏐 教練證資料已送出",
             f"填寫人：{basic_info['name']}",
@@ -193,6 +211,7 @@ def certificates():
 
         send_email_notify("教練證資料已送出", body)
 
+        # 用完就清掉 session
         session.pop("basic_info", None)
 
         return render_template("complete.html")
@@ -203,6 +222,7 @@ def certificates():
 # 後台頁面
 @app.route("/admin")
 def admin():
+    # 後台密碼從環境變數讀，沒有再用 config
     admin_key = os.getenv("ADMIN_KEY", getattr(config, "ADMIN_KEY", "changeme"))
     key = request.args.get("key", "")
     if key != admin_key:
@@ -229,6 +249,7 @@ def admin():
         "SELECT COUNT(*) FROM certificates"
     ).fetchone()[0]
 
+    # 收集各 submission 的教練明細
     details = {}
     rows = db.execute(
         """
@@ -253,7 +274,7 @@ def admin():
     )
 
 
-# 初始化 DB
+# CLI 指令：在本機可以用 "flask init-db" 重建資料庫
 @app.cli.command("init-db")
 def init_db_command():
     init_db()
@@ -261,6 +282,7 @@ def init_db_command():
 
 
 if __name__ == "__main__":
+    # 本機直接跑 app.py 時也會確保資料表存在
     with app.app_context():
         init_db()
     app.run(debug=True, host="0.0.0.0", port=5000)
